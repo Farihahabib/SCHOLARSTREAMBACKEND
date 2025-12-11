@@ -17,7 +17,7 @@ const app = express()
 app.use(
   cors({
     origin: [
-      'http://localhost:5173',
+      'http://localhost:5176',
       'http://localhost:5178',
     //   'https://b12-m11-session.web.app',
     ],
@@ -64,6 +64,13 @@ async function run() {
 //get all scholarships
 app.get('/scholarships',async(req,res)=>{
     const result = await scholarshipCollection.find().toArray()
+     res.send(result)
+})
+//get single scholarship
+const { ObjectId } = require('mongodb');
+app.get('/scholarships/:id',async(req,res)=>{
+  const id = req.params.id;
+    const result = await scholarshipCollection.findOne({_id: new ObjectId(id)})
      res.send(result)
 })
     // Send a ping to confirm a successful connection
