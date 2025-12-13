@@ -53,6 +53,8 @@ async function run() {
   const db = client.db('ScholarStream')
   const scholarshipCollection = db.collection('Scholarships')
   const applyCollection = db.collection('applys')
+  const usersCollection = db.collection('users')
+  const reviewsCollection = db.collection('reviews')
  //post scholarship data
   app.post('/scholarships',async(req,res)=>{
     const scholarshipData = req.body;
@@ -61,57 +63,31 @@ async function run() {
   })
 //get all scholarships
 app.get('/scholarships',async(req,res)=>{
-    const result = await scholarshipCollection.find().toArray()
-     res.send(result)
+const result = await scholarshipCollection.find().toArray()
+  res.send(result)
+
 })
+
+app.delete('/scholarships/:id',async(req,res)=>{
+  const {id} = req.params
+const objectId = new ObjectId(id)
+const filter = {_id: objectId}
+  const result = await scholarshipCollection.deleteOne(filter)
+  res.send(result)
+
+})
+
 //get single scholarship
 app.get('/scholarships/:id',async(req,res)=>{
   const id = req.params.id;
     const result = await scholarshipCollection.findOne({_id: new ObjectId(id)})
      res.send(result)
 })
- // search and filter scholarships
-//  app.get('/scholarships', async (req, res) => {
-//     try {
-//       const { search, country, sortBy, order, page = 1, limit = 8 } = req.query;
-
-//       const query = {};
-//       if (search) query.universityName = { $regex: search, $options: 'i' };
-//       if (country) query.country = country;
-
-//       let cursor = scholarshipCollection.find(query);
-
-//       // Sort
-//       if (sortBy) {
-//         const sortOrder = order === 'desc' ? -1 : 1;
-//         cursor = cursor.sort({ [sortBy]: sortOrder });
-//       }
-
-//       // Pagination
-//       const pageNum = parseInt(page);
-//       const pageLimit = parseInt(limit);
-//       const total = await scholarshipCollection.countDocuments(query);
-//       const scholarships = await cursor
-//         .skip((pageNum - 1) * pageLimit)
-//         .limit(pageLimit)
-//         .toArray();
-
-//       res.send({
-//         scholarships,
-//         total,
-//         page: pageNum,
-//         pages: Math.ceil(total / pageLimit),
-//       });
-//     } catch (err) {
-//       console.error(err);
-//       res.status(500).send({ error: 'Something went wrong' });
-//     }
-//   })
 
 // payment endpoint
  app.post('/create-checkout-session', async (req, res) => {
       const paymentInfo = req.body;
-      // console.log(paymentInfo)
+      console.log(paymentInfo)
       const session = await stripe.checkout.sessions.create({
         line_items: [
           {
@@ -128,6 +104,8 @@ app.get('/scholarships/:id',async(req,res)=>{
           },
         ],
         customer_email: paymentInfo?.Student?.email,
+
+        
         mode: 'payment',
         metadata: {
           scholarshipId: paymentInfo?.scholarshipId,
@@ -146,7 +124,8 @@ app.post('/payment-success', async (req, res) => {
       console.log('payment-session',session)
       const  scholarship = await scholarshipCollection.findOne({_id:
          new ObjectId(session.metadata.scholarshipId)})
-      // console.log(session)
+         console.log('scholarship',scholarship)
+      console.log(session)
       const apply = await applyCollection.findOne({
         tranjectionId: session.payment_intent,
       })
@@ -155,6 +134,8 @@ app.post('/payment-success', async (req, res) => {
           scholarshipId: session.metadata.scholarshipId,
           tranjectionId: session.payment_intent,
           student : session.metadata.customer,
+          studentName : scholarship.moderator.name,
+          studentEmail : session.customer_details.email,
           moderator:session.moderator,
           status: 'pending',
           scholarshipName: scholarship.scholarshipName,
@@ -178,8 +159,103 @@ app.get('/my-applications/:email',async(req,res)=>{
 const email = req.params.email;
 const result = await applyCollection.find({student:email}).toArray()
   res.send(result)
+})
+//get all applys 
+app.get('/applications',async(req,res)=>{
+const result = await applyCollection.find().toArray()
+  res.send(result)
 
 })
+
+// update application status
+app.patch('/applications/status/:id',async(req,res)=>{
+  const id = req.params.id;
+  const {status} = req.body;
+  const objectId = new ObjectId(id);
+  const result = await applyCollection.updateOne({_id:objectId},{$set:{status}} )
+  res.send({
+    success:true,
+    message:'Application status updated successfully',
+    result
+  })
+ 
+
+})
+//post review
+app.post("/reviews", async (req, res) => {
+  const review = req.body;
+
+  const alreadyReviewed = await reviewsCollection.findOne({
+    applicationId: review.applicationId,
+    studentEmail: review.studentEmail,
+  });
+
+  if (alreadyReviewed) {
+    return res.status(400).send({ message: "Already reviewed" });
+  }
+
+  const result = await reviewsCollection.insertOne(review);
+  res.send(result);
+});
+//get review
+app.get("/reviews", async (req, res) => {
+  const reviews = await reviewsCollection.find({}).toArray();
+  res.send(reviews);
+});
+//get single reviews by email
+app.get('/my-reviews/:email',async(req,res)=>{
+const email = req.params.email;
+const result = await reviewsCollection.find({ studentEmail: email }).toArray();
+  res.send(result)
+})
+//delete review
+app.delete("/reviews/:id", async (req, res) => {
+  const { id } = req.params;
+    const result = await reviewsCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount > 0) {
+      return res.send({ success: true, message: "Review deleted successfully" });
+    } else {
+      return res.status(404).send({ success: false, message: "Review not found" });
+    }
+  
+});
+// Delete a review by ID, only if it belongs to the user
+app.delete("/my-reviews/:id/:email", async (req, res) => {
+  const { id, email } = req.params;
+const result = await reviewsCollection.deleteOne({
+  _id: new ObjectId(id),
+  studentEmail: email,
+});
+
+
+    if (result.deletedCount > 0) {
+      return res.send({ success: true, message: "Review deleted successfully" });
+    } else {
+      return res.status(404).send({ success: false, message: "Review not found or not yours" });
+    }
+  
+});
+//edit review
+// Update review by ID
+app.patch('/reviews/:id', async (req, res) => {
+  const id = req.params.id;
+  const { rating, comment } = req.body;
+    const result = await reviewsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { rating, comment } }
+    );
+    if (result.modifiedCount > 0) {
+      res.send({ success: true, message: "Review updated" });
+    } else {
+      res.status(404).send({ success: false, message: "Review not found" });
+
+  } 
+});
+
+
+
+
 //get all applys for moderator by email
 app.get('/moderator-applications/:email',async(req,res)=>{
 const email = req.params.email;
@@ -188,8 +264,28 @@ const result = await scholarshipCollection.find({'moderator.email':email}).toArr
   )  }
 )
 
+app.post('/users',async(req,res)=>{
+const userData = req.body;
+userData.created_at = new Date().toISOString();
+userData.last_loggesIn = new Date().toISOString();
+userData.role = 'student';
+const query = {email:userData.email}
+const alreadyExists = await usersCollection.findOne(query)
+console.log('userExists',!!alreadyExists)
+if(alreadyExists){
+  console.log('updating user info')
+  const result = await usersCollection.updateOne(query,{$set:{
+    last_loggedIn:new Date().toISOString(),
+  },
+})
+  return res.send(result)
+}
+console.log('saving new user')
+const result = await usersCollection.insertOne(userData)
+res.send(result)
 
 
+})
 
 
 
