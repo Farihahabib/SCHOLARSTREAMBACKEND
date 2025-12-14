@@ -33,7 +33,6 @@ const verifyJWT = async (req, res, next) => {
   try {
     const decoded = await admin.auth().verifyIdToken(token)
     req.tokenEmail = decoded.email
-    console.log('decode',decoded)
     next()
   } catch (err) {
     console.log(err)
@@ -151,15 +150,7 @@ app.get('/scholarships',verifyJWT, async (req, res) => {
   }
 });
 
-//delete one scholarship
-app.delete('/scholarships/:id',verifyJWT,verifyADMIN,async(req,res)=>{
-  const {id} = req.params
-const objectId = new ObjectId(id)
-const filter = {_id: objectId}
-  const result = await scholarshipCollection.deleteOne(filter)
-  res.send(result)
 
-})
 
 //get single scholarship
 app.get('/scholarships/:id',async(req,res)=>{
@@ -168,7 +159,7 @@ app.get('/scholarships/:id',async(req,res)=>{
      res.send(result)
 })
 //delete single scholarship
-app.delete('/scholarships/:id',verifyJWT, async (req, res) => {
+app.delete('/scholarships/:id',verifyJWT,verifyADMIN, async (req, res) => {
 
     const id = req.params.id;
     const result = await scholarshipCollection.deleteOne({ _id: new ObjectId(id) });
@@ -405,7 +396,6 @@ app.post('/payment-success',verifyJWT, async (req, res) => {
       const  scholarship = await scholarshipCollection.findOne({_id:
          new ObjectId(session.metadata.scholarshipId)})
          console.log('scholarship',scholarship)
-      console.log(session)
       const apply = await applyCollection.findOne({
         tranjectionId: session.payment_intent,
       })
