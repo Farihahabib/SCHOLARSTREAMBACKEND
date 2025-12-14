@@ -83,6 +83,47 @@ app.get('/scholarships/:id',async(req,res)=>{
     const result = await scholarshipCollection.findOne({_id: new ObjectId(id)})
      res.send(result)
 })
+//delete single scholarship
+app.delete('/scholarships/:id', async (req, res) => {
+
+    const id = req.params.id;
+    const result = await scholarshipCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'Scholarship not found' });
+    }
+
+    res.json({ message: 'Scholarship deleted successfully' });
+});
+//update/scholarship/id
+app.put('/scholarships/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const newData = req.body; // must contain all fields of the scholarship
+
+    // Validate ID
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid scholarship ID' });
+    }
+
+    // Replace the entire document
+    const result = await scholarshipCollection.replaceOne(
+      { _id: new ObjectId(id) },
+      newData
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Scholarship not found' });
+    }
+
+    res.json({ message: 'Scholarship updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to update scholarship' });
+  }
+});
+
+
 
 // payment endpoint
  app.post('/create-checkout-session', async (req, res) => {
@@ -237,7 +278,6 @@ const result = await reviewsCollection.deleteOne({
   
 });
 //edit review
-// Update review by ID
 app.patch('/reviews/:id', async (req, res) => {
   const id = req.params.id;
   const { rating, comment } = req.body;
@@ -252,10 +292,6 @@ app.patch('/reviews/:id', async (req, res) => {
 
   } 
 });
-
-
-
-
 //get all applys for moderator by email
 app.get('/moderator-applications/:email',async(req,res)=>{
 const email = req.params.email;
@@ -263,33 +299,58 @@ const result = await scholarshipCollection.find({'moderator.email':email}).toArr
   res.send(result
   )  }
 )
+//save users in database
+ app.post('/users', async (req, res) => {
+      const userData = req.body
+      userData.created_at = new Date().toISOString()
+      userData.last_loggedIn = new Date().toISOString()
+      userData.role = 'customer'
 
-app.post('/users',async(req,res)=>{
-const userData = req.body;
-userData.created_at = new Date().toISOString();
-userData.last_loggesIn = new Date().toISOString();
-userData.role = 'student';
-const query = {email:userData.email}
-const alreadyExists = await usersCollection.findOne(query)
-console.log('userExists',!!alreadyExists)
-if(alreadyExists){
-  console.log('updating user info')
-  const result = await usersCollection.updateOne(query,{$set:{
-    last_loggedIn:new Date().toISOString(),
-  },
-})
-  return res.send(result)
-}
-console.log('saving new user')
-const result = await usersCollection.insertOne(userData)
-res.send(result)
+      const query = {
+        email: userData.email,
+      }
 
+      const alreadyExists = await usersCollection.findOne(query)
+      console.log('User Already Exists---> ', !!alreadyExists)
 
-})
+      if (alreadyExists) {
+        console.log('Updating user info......')
+        const result = await usersCollection.updateOne(query, {
+          $set: {
+            last_loggedIn: new Date().toISOString(),
+          },
+        })
+        return res.send(result)
+      }
 
+      console.log('Saving new user info......')
+      const result = await usersCollection.insertOne(userData)
+      res.send(result)
+    })
 
+//get all users
+app.get('/users', async (req, res) => {
+  const users = await usersCollection.find().toArray();
+  res.send(users);
+});
 
+// Update role
+app.patch('/users/:id/role', async (req, res) => {
+  const { role } = req.body;
+  const { id } = req.params;
+  const result = await usersCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { role } }
+  );
+  res.send(result);
+});
 
+// Delete user
+app.delete('/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
+  res.send(result);
+});
 
 
 
