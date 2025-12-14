@@ -459,7 +459,7 @@ app.get('/analytics/applications-chart',verifyJWT,verifyADMIN,  async (req, res)
       'Pinged your deployment. You successfully connected to MongoDB!'
     )
   } finally {
-    // Ensures that the client will close when you finish/error
+   
   }
 }
 run().catch(console.dir)
@@ -468,6 +468,7 @@ app.get('/', (req, res) => {
   res.send('Hello from Server..')
 })
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`)
-})
+// app.listen(port, () => {
+//   console.log(`Server is running on port ${port}`)
+// })
+module.exports = app;
