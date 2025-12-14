@@ -351,6 +351,32 @@ app.delete('/users/:id', async (req, res) => {
   const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
   res.send(result);
 });
+//for analytics
+//total users
+app.get('/analytics/total-users', async (req, res) => {
+  const totalUsers = await usersCollection.countDocuments();
+  res.send({ totalUsers });
+});
+//total scholarships
+app.get('/analytics/total-scholarships', async (req, res) => {
+  const totalScholarships = await scholarshipCollection.countDocuments();
+  res.send({ totalScholarships });
+});
+//total applicatons
+app.get('/analytics/total-fees', async (req, res) => {
+  const result = await applyCollection.aggregate([
+    { $group: { _id: null, totalFees: { $sum: "$applicationFees" } } }
+  ]).toArray();
+  res.send({ totalFees: result[0]?.totalFees || 0 });
+});
+//applications by university
+app.get('/analytics/applications-chart', async (req, res) => {
+  const data = await applyCollection.aggregate([
+    { $group: { _id: "$universityName", applications: { $sum: 1 } } }
+  ]).toArray();
+  res.send(data);
+});
+
 
 
 
