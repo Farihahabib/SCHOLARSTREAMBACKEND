@@ -152,7 +152,7 @@ app.get('/scholarships',verifyJWT, async (req, res) => {
 });
 
 //delete one scholarship
-app.delete('/scholarships/:id',verifyJWT,async(req,res)=>{
+app.delete('/scholarships/:id',verifyJWT,verifyADMIN,async(req,res)=>{
   const {id} = req.params
 const objectId = new ObjectId(id)
 const filter = {_id: objectId}
@@ -180,7 +180,7 @@ app.delete('/scholarships/:id',verifyJWT, async (req, res) => {
     res.json({ message: 'Scholarship deleted successfully' });
 });
 //update/scholarship/id
-app.put('/scholarships/:id',verifyJWT, async (req, res) => {
+app.put('/scholarships/:id',verifyJWT,verifyADMIN, async (req, res) => {
   try {
     const id = req.params.id;
     const newData = req.body; // must contain all fields of the scholarship
@@ -217,14 +217,14 @@ const result = await applyCollection.find({studentEmail: req.tokenEmail}).toArra
   res.send(result)
 })
 //get all applys 
-app.get('/applications',verifyJWT,async(req,res)=>{
+app.get('/applications',verifyJWT,verifyMODERATOR,async(req,res)=>{
 const result = await applyCollection.find().toArray()
   res.send(result)
 
 })
 
 // update application status
-app.patch('/applications/status/:id',verifyJWT,async(req,res)=>{
+app.patch('/applications/status/:id',verifyJWT,verifyMODERATOR,async(req,res)=>{
   const id = req.params.id;
   const {status} = req.body;
   const objectId = new ObjectId(id);
@@ -254,7 +254,7 @@ app.post("/reviews",verifyJWT, async (req, res) => {
   res.send(result);
 });
 //get review
-app.get("/reviews",verifyJWT, async (req, res) => {
+app.get("/reviews",verifyJWT,verifyMODERATOR, async (req, res) => {
   const reviews = await reviewsCollection.find({}).toArray();
   res.send(reviews);
 });
@@ -264,7 +264,7 @@ const result = await reviewsCollection.find({ studentEmail: req.tokenEmail }).to
   res.send(result)
 })
 //delete review
-app.delete("/reviews/:id",verifyJWT, async (req, res) => {
+app.delete("/reviews/:id",verifyJWT,verifyMODERATOR, async (req, res) => {
   const { id } = req.params;
     const result = await reviewsCollection.deleteOne({ _id: new ObjectId(id) });
 
@@ -336,7 +336,7 @@ app.patch('/reviews/:id',verifyJWT, async (req, res) => {
     })
 
 //get all users
-app.get('/users',verifyJWT, async (req, res) => {
+app.get('/users',verifyJWT,verifyADMIN, async (req, res) => {
   const users = await usersCollection.find().toArray();
   res.send(users);
 });
@@ -347,7 +347,7 @@ app.get('/user/role/',verifyJWT, async (req, res) => {
       console.log(result)
  })
 // Update role
-app.patch('/users/:id/role', async (req, res) => {
+app.patch('/users/:id/role',verifyJWT,verifyADMIN, async (req, res) => {
   const { role } = req.body;
   const { id } = req.params;
   const result = await usersCollection.updateOne(
@@ -358,7 +358,7 @@ app.patch('/users/:id/role', async (req, res) => {
 });
 
 // Delete user
-app.delete('/users/:id', async (req, res) => {
+app.delete('/users/:id',verifyJWT,verifyADMIN, async (req, res) => {
   const { id } = req.params;
   const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
   res.send(result);
@@ -436,24 +436,24 @@ app.post('/payment-success',verifyJWT, async (req, res) => {
 
 //for analytics
 //total users
-app.get('/analytics/total-users',verifyJWT, async (req, res) => {
+app.get('/analytics/total-users',verifyJWT,verifyADMIN, async (req, res) => {
   const totalUsers = await usersCollection.countDocuments();
   res.send({ totalUsers });
 });
 //total scholarships
-app.get('/analytics/total-scholarships',verifyJWT, async (req, res) => {
+app.get('/analytics/total-scholarships',verifyJWT,verifyADMIN, async (req, res) => {
   const totalScholarships = await scholarshipCollection.countDocuments();
   res.send({ totalScholarships });
 });
 //total applicatons
-app.get('/analytics/total-fees',verifyJWT,  async (req, res) => {
+app.get('/analytics/total-fees',verifyJWT,verifyADMIN,  async (req, res) => {
   const result = await applyCollection.aggregate([
     { $group: { _id: null, totalFees: { $sum: "$applicationFees" } } }
   ]).toArray();
   res.send({ totalFees: result[0]?.totalFees || 0 });
 });
 //applications by university
-app.get('/analytics/applications-chart',verifyJWT,  async (req, res) => {
+app.get('/analytics/applications-chart',verifyJWT,verifyADMIN,  async (req, res) => {
   const data = await applyCollection.aggregate([
     { $group: { _id: "$universityName", applications: { $sum: 1 } } }
   ]).toArray();
