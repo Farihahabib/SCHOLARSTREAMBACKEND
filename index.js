@@ -27,18 +27,27 @@ app.use(express.json())
 
 // jwt middlewares
 const verifyJWT = async (req, res, next) => {
-  const token = req?.headers?.authorization?.split(' ')[1]
-  console.log(token)
-  if (!token) return res.status(401).send({ message: 'Unauthorized Access!' })
-  try {
-    const decoded = await admin.auth().verifyIdToken(token)
-    req.tokenEmail = decoded.email
-    next()
-  } catch (err) {
-    console.log(err)
-    return res.status(401).send({ message: 'Unauthorized Access!', err })
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).send({ message: 'Unauthorized Access!' });
   }
-}
+
+  const token = authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).send({ message: 'Unauthorized Access!' });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.tokenEmail = decoded.email;
+    next();
+  } catch (err) {
+    console.error(err);
+    return res.status(401).send({ message: 'Unauthorized Access!' });
+  }
+};
 
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -60,7 +69,7 @@ async function run() {
     const verifyADMIN = async (req, res, next) => {
       const email = req.tokenEmail
       const user = await usersCollection.findOne({ email })
-      if (user?.role !== 'admin')
+      if (user?.role !== 'Admin')
         return res
           .status(403)
           .send({ message: 'Admin only Actions!', role: user?.role })
@@ -71,7 +80,7 @@ async function run() {
     const verifyMODERATOR = async (req, res, next) => {
       const email = req.tokenEmail
       const user = await usersCollection.findOne({ email })
-      if (user?.role !== 'moderator')
+      if (user?.role !== 'Moderator')
         return res
           .status(403)
           .send({ message: 'moderator only Actions!', role: user?.role })
@@ -80,13 +89,13 @@ async function run() {
     }
     
  //post scholarship data
-  app.post('/scholarships',verifyJWT,async(req,res)=>{
+  app.post('/scholarships',verifyJWT,verifyADMIN,async(req,res)=>{
     const scholarshipData = req.body;
     const result = await scholarshipCollection.insertOne(scholarshipData)
     res.send(result)
   })
 //get all scholarships
-app.get('/scholarships',verifyJWT, async (req, res) => {
+app.get('/allscholarships', async (req, res) => {
   try {
     const {
       search = '',
@@ -150,7 +159,11 @@ app.get('/scholarships',verifyJWT, async (req, res) => {
   }
 });
 
-
+//get all scholarships for admin
+app.get('/scholarships',verifyJWT,verifyADMIN,async(req,res)=>{
+  const result = await scholarshipCollection.find().toArray()
+  res.send(result)
+})
 
 //get single scholarship
 app.get('/scholarships/:id',async(req,res)=>{
@@ -468,7 +481,7 @@ app.get('/', (req, res) => {
   res.send('Hello from Server..')
 })
 
-// app.listen(port, () => {
-//   console.log(`Server is running on port ${port}`)
-// })
-module.exports = app;
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`)
+})
+// module.exports = app;
