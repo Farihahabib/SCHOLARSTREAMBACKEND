@@ -18,9 +18,8 @@ const app = express()
 // middleware
 app.use(
   cors({
-    origin: [process.env.CLIENT_DOMAIN,'http://localhost:5173'],
+    origin: ["http://localhost:5173",process.env.CLIENT_DOMAIN,"https://scholarstream123.netlify.app"],
     credentials: true,
-    optionSuccessStatus: 200,
   })
 )
 app.use(express.json())
@@ -241,6 +240,56 @@ app.patch('/applications/status/:id',verifyJWT,verifyMODERATOR,async(req,res)=>{
  
 
 })
+
+// delete application (only for students who own the application)
+app.delete('/applications/:id', verifyJWT, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const objectId = new ObjectId(id);
+    
+    // First, check if the application exists and belongs to the requesting user
+    const application = await applyCollection.findOne({
+      _id: objectId,
+      studentEmail: req.tokenEmail
+    });
+    
+    if (!application) {
+      return res.status(404).send({
+        success: false,
+        message: 'Application not found or you do not have permission to delete it'
+      });
+    }
+    
+    // Only allow deletion of pending applications
+    if (application.status !== 'pending') {
+      return res.status(400).send({
+        success: false,
+        message: 'Only pending applications can be deleted'
+      });
+    }
+    
+    // Delete the application
+    const result = await applyCollection.deleteOne({ _id: objectId });
+    
+    if (result.deletedCount > 0) {
+      res.send({
+        success: true,
+        message: 'Application deleted successfully'
+      });
+    } else {
+      res.status(500).send({
+        success: false,
+        message: 'Failed to delete application'
+      });
+    }
+  } catch (error) {
+    console.error('Error deleting application:', error);
+    res.status(500).send({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
 //post review
 app.post("/reviews",verifyJWT, async (req, res) => {
   const review = req.body;
@@ -346,9 +395,17 @@ app.get('/users',verifyJWT,verifyADMIN, async (req, res) => {
 });
  // get a user's role 
 app.get('/user/role/',verifyJWT, async (req, res) => {
-     const result = await usersCollection.findOne({ email: req.tokenEmail })
-      res.send({ role: result?.role })
-      console.log(result)
+  try {
+    const result = await usersCollection.findOne({ email: req.tokenEmail })
+    console.log('User found:', result)
+    
+    // If user doesn't exist or doesn't have a role, default to 'Student'
+    const userRole = result?.role || 'Student'
+    res.send({ role: userRole })
+  } catch (error) {
+    console.error('Error fetching user role:', error)
+    res.status(500).send({ error: 'Failed to fetch user role' })
+  }
  })
 // Update role
 app.patch('/users/:id/role',verifyJWT,verifyADMIN, async (req, res) => {
@@ -359,6 +416,58 @@ app.patch('/users/:id/role',verifyJWT,verifyADMIN, async (req, res) => {
     { $set: { role } }
   );
   res.send(result);
+});
+
+// Role request endpoint - for users to request role changes
+app.patch('/users/:id/roleRequest', verifyJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { requestedRole } = req.body;
+    
+    // Validate the requested role
+    const validRoles = ['Student', 'Moderator', 'Admin'];
+    if (!validRoles.includes(requestedRole)) {
+      return res.status(400).send({ message: 'Invalid role requested' });
+    }
+    
+    // Check if user exists and is requesting for themselves
+    const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+    if (!user) {
+      return res.status(404).send({ message: 'User not found' });
+    }
+    
+    // Users can only request role changes for themselves (unless they're admin)
+    const requestingUser = await usersCollection.findOne({ email: req.tokenEmail });
+    if (requestingUser.role !== 'Admin' && user.email !== req.tokenEmail) {
+      return res.status(403).send({ message: 'You can only request role changes for yourself' });
+    }
+    
+    // Update the user's role request status
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          roleRequest: requestedRole,
+          roleRequestDate: new Date().toISOString(),
+          roleRequestStatus: 'pending'
+        } 
+      }
+    );
+    
+    if (result.modifiedCount === 0) {
+      return res.status(400).send({ message: 'Failed to update role request' });
+    }
+    
+    res.send({ 
+      success: true, 
+      message: 'Role request submitted successfully',
+      requestedRole: requestedRole
+    });
+    
+  } catch (error) {
+    console.error('Role request error:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
 });
 
 // Delete user
